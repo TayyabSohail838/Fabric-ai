@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
@@ -180,11 +180,6 @@ if not HEALTH["trained"]:
 app = FastAPI(title="Fabric inspection")
 
 
-@app.get("/")
-def index():
-    return FileResponse(STATIC / "index.html")
-
-
 @app.get("/api/meta")
 def meta():
     return {
@@ -227,7 +222,9 @@ async def predict(request: Request, tta: bool = False, grid: bool = False):
     return JSONResponse(result)
 
 
-app.mount("/static", StaticFiles(directory=STATIC), name="static")
+# Mounted last so /api/* wins. Serving static/ at the root means the page uses
+# the same relative paths here as it does on a static host, where static/ IS the root.
+app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
 
 
 # --------------------------------------------------------------------------

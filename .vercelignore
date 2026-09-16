@@ -1,0 +1,12 @@
+# Vercel deploys static/ only. Keeping the Python files out of the upload stops
+# Vercel's zero-config FastAPI detection from trying to build a serverless
+# function - torch plus its CUDA wheels is ~5 GB, far past the 250 MB limit.
+app.py
+export_onnx.py
+webcam_demo.py
+requirements.txt
+fabric_model.pt
+.venv/
+__pycache__/
+.certs/
+README.md

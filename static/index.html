@@ -8,7 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
 </head>
 <body>
 
@@ -20,7 +21,7 @@
   <dl class="spec" aria-label="Model">
     <div><dt>Model</dt><dd>baseline-cnn</dd></div>
     <div><dt>Input</dt><dd>224&times;224</dd></div>
-    <div><dt>Classes</dt><dd>6</dd></div>
+    <div><dt>Runs on</dt><dd id="spec-backend">&mdash;</dd></div>
     <div><dt>Latency</dt><dd id="spec-latency">&mdash;</dd></div>
   </dl>
   <label class="camera-pick">
@@ -127,7 +128,6 @@
   </ol>
 </section>
 
-<canvas id="grab" hidden></canvas>
-<script src="/static/app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

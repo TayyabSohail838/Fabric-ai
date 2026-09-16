@@ -12,8 +12,8 @@ venv/
 .playwright-mcp/
 *.log
 
-# Model weights (25.7 MB). Excluded deliberately: the current checkpoint is
-# untrained, so it has no value to anyone cloning this, and a binary that size
-# would live in git history permanently. See "the shipped model is untrained"
-# in README.md. To include it anyway: git add -f fabric_model.pt
+# PyTorch weights. The deployed model is static/fabric_model.onnx, which IS
+# committed because the site needs it; this .pt is the source artefact you
+# retrain and re-export from, so it stays out of history.
+# Regenerate the onnx with: python export_onnx.py
 fabric_model.pt
