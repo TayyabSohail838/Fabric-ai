@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fabric Inspection</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23E4DFD3'/%3E%3Cg fill='%2323406E'%3E%3Crect x='2' y='1' width='2' height='14'/%3E%3Crect x='7' y='1' width='2' height='14'/%3E%3Crect x='12' y='1' width='2' height='14'/%3E%3C/g%3E%3Cg fill='%2323406E' opacity='.45'%3E%3Crect x='1' y='2' width='14' height='2'/%3E%3Crect x='1' y='7' width='14' height='2'/%3E%3Crect x='1' y='12' width='14' height='2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Martian+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="mark">
+    <span class="mark__weave" aria-hidden="true"></span>
+    <h1>Fabric&nbsp;Inspection</h1>
+  </div>
+  <dl class="spec" aria-label="Model">
+    <div><dt>Model</dt><dd>baseline-cnn</dd></div>
+    <div><dt>Input</dt><dd>224&times;224</dd></div>
+    <div><dt>Classes</dt><dd>6</dd></div>
+    <div><dt>Latency</dt><dd id="spec-latency">&mdash;</dd></div>
+  </dl>
+  <label class="camera-pick">
+    <span>Camera</span>
+    <select id="camera-select" aria-label="Camera"><option>Starting&hellip;</option></select>
+  </label>
+</header>
+
+<div class="alert" id="alert" hidden>
+  <p class="alert__title">This model is untrained</p>
+  <p class="alert__body" id="alert-body"></p>
+</div>
+
+<main class="bench">
+
+  <!-- ─── Stage ────────────────────────────────────────────────── -->
+  <section class="stage" aria-label="Camera">
+    <div class="viewport" id="viewport">
+      <video id="feed" playsinline muted autoplay></video>
+
+      <!-- the pick glass: what the model actually sees -->
+      <div class="aperture" id="aperture" data-state="idle">
+        <div class="aperture__ticks aperture__ticks--top" aria-hidden="true"></div>
+        <div class="aperture__ticks aperture__ticks--left" aria-hidden="true"></div>
+        <span class="aperture__axis aperture__axis--weft" aria-hidden="true">weft</span>
+        <span class="aperture__axis aperture__axis--warp" aria-hidden="true">warp</span>
+        <div class="aperture__window">
+          <div class="aperture__sweep" aria-hidden="true"></div>
+          <div class="aperture__grid" id="tile-grid" hidden></div>
+          <span class="aperture__corner tl" aria-hidden="true"></span>
+          <span class="aperture__corner tr" aria-hidden="true"></span>
+          <span class="aperture__corner bl" aria-hidden="true"></span>
+          <span class="aperture__corner br" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <p class="viewport__note" id="viewport-note">Starting the camera&hellip;</p>
+      <img class="viewport__freeze" id="freeze" alt="" hidden>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn--primary" id="btn-live" type="button">
+        <span class="btn__dot" aria-hidden="true"></span><span id="btn-live-text">Scan live</span>
+      </button>
+      <button class="btn" id="btn-capture" type="button">Capture <kbd>space</kbd></button>
+
+      <div class="switches" role="group" aria-label="Inspection options">
+        <label class="switch"><input type="checkbox" id="opt-grid"><span>Locate&nbsp;3&times;3</span></label>
+        <label class="switch"><input type="checkbox" id="opt-tta" checked><span>Flip&nbsp;average</span></label>
+        <label class="switch"><input type="checkbox" id="opt-full"><span>Full&nbsp;frame</span></label>
+      </div>
+
+      <label class="dial">
+        <span>Call a defect above</span>
+        <input type="range" id="opt-threshold" min="40" max="95" step="5" value="60">
+        <output id="threshold-out">60%</output>
+      </label>
+    </div>
+  </section>
+
+  <!-- ─── Readout ──────────────────────────────────────────────── -->
+  <section class="readout" aria-label="Result">
+    <div class="verdict" id="verdict" data-state="idle">
+      <p class="verdict__eyebrow" id="verdict-eyebrow">Standing by</p>
+      <p class="verdict__label" id="verdict-label">&mdash;</p>
+      <p class="verdict__hint" id="verdict-hint">Press <kbd>L</kbd> to scan live, or capture a single frame.</p>
+      <div class="verdict__meter">
+        <div class="verdict__fill" id="verdict-fill"></div>
+      </div>
+      <p class="verdict__figures">
+        <span class="mono" id="verdict-conf">--.-%</span>
+        <span class="verdict__raw mono" id="verdict-raw">&mdash;</span>
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">All classes</h2>
+      <ul class="bars" id="bars"></ul>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel__title">This session</h2>
+      <dl class="tally" id="tally">
+        <div><dt>Captures</dt><dd class="mono" id="tally-total">0</dd></div>
+        <div><dt>Defects</dt><dd class="mono" id="tally-defects">0</dd></div>
+        <div><dt>Defect rate</dt><dd class="mono" id="tally-rate">&mdash;</dd></div>
+        <div><dt>Scan rate</dt><dd class="mono" id="tally-fps">&mdash;</dd></div>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<!-- ─── Capture log ────────────────────────────────────────────── -->
+<section class="log" aria-label="Captures">
+  <div class="log__head">
+    <h2>Captures</h2>
+    <div class="log__actions">
+      <button class="btn btn--quiet" id="btn-export" type="button" disabled>Export CSV</button>
+      <button class="btn btn--quiet" id="btn-clear" type="button" disabled>Clear</button>
+    </div>
+  </div>
+  <ol class="log__strip" id="log-strip">
+    <li class="log__empty" id="log-empty">Captures land here. Each one keeps its thumbnail, class and confidence.</li>
+  </ol>
+</section>
+
+<canvas id="grab" hidden></canvas>
+<script src="/static/app.js"></script>
+</body>
+</html>
