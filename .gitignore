@@ -17,3 +17,11 @@ venv/
 # retrain and re-export from, so it stays out of history.
 # Regenerate the onnx with: python export_onnx.py
 fabric_model.pt
+
+# Training data. data/ holds the generated crops (tools/build_dataset.py and
+# tools/split_dataset.py); the downloaded dataset archives are its inputs.
+data/
+*.coco.zip
+*.coco-segmentation.zip
+Fabric Defects Dataset.zip
+afid-DatasetNinja.tar
