@@ -36,8 +36,15 @@ create policy "anon can insert captures"
   to anon
   with check (true);
 
+drop policy if exists "anon can select captures" on public.captures;
+create policy "anon can select captures"
+  on public.captures
+  for select
+  to anon
+  using (true);
+
 revoke all on public.captures from anon, authenticated;
-grant insert on public.captures to anon;
+grant insert, select on public.captures to anon;
 
 -- 2. Storage Bucket for fabric capture images
 insert into storage.buckets (id, name, public)

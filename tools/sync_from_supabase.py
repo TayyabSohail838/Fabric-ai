@@ -66,7 +66,15 @@ def fetch_captures(url: str, key: str, table: str, limit: int = 1000) -> list[di
         with urllib.request.urlopen(req) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as err:
-        sys.exit(f"Failed to query Supabase ({err.code}): {err.read().decode('utf-8')}")
+        body = err.read().decode("utf-8")
+        if "permission denied" in body or "42501" in body:
+            sys.exit(
+                "\n[!] Permission Denied on table 'public.captures'.\n"
+                "To allow dataset synchronization, run this in your Supabase SQL Editor:\n\n"
+                "    grant select on public.captures to anon;\n"
+                "    create policy \"anon can select captures\" on public.captures for select to anon using (true);\n"
+            )
+        sys.exit(f"Failed to query Supabase ({err.code}): {body}")
 
 
 def download_image(img_url: str, dest_path: Path) -> bool:
