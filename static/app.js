@@ -463,11 +463,36 @@
     }
 
     const table = cfg.table || "captures";
+    const bucket = cfg.bucket || "fabric-captures";
     const device = deviceId();
     let sessionId = newId();
 
-    async function insert(row) {
+    async function uploadImage(blob, fileName) {
+      if (!blob || !client.storage) return null;
       try {
+        let query = client.storage.from(bucket).upload(fileName, blob, {
+          contentType: "image/jpeg",
+          upsert: false,
+        });
+        const { error } = await query;
+        if (error) {
+          console.warn("[cloud] Image upload rejected:", error.message || error);
+          return null;
+        }
+        return fileName;
+      } catch (err) {
+        console.warn("[cloud] Image upload failed:", err.message || err);
+        return null;
+      }
+    }
+
+    async function insert(row, blob) {
+      try {
+        if (blob) {
+          const fileName = `${device}/${sessionId}_${Date.now()}_${row.class_name}.jpg`;
+          const imagePath = await uploadImage(blob, fileName);
+          if (imagePath) row.image_path = imagePath;
+        }
         // No .select() afterwards: the anon role may insert but not read back.
         let query = client.from(table).insert(row);
         if (AbortSignal.timeout) query = query.abortSignal(AbortSignal.timeout(INSERT_TIMEOUT_MS));
@@ -479,7 +504,7 @@
     }
 
     return {
-      log(shot) {
+      log(shot, blob) {
         const probabilities = {};
         CLASSES.forEach((c, i) => { probabilities[c.name] = Number(shot.probs[i].toFixed(6)); });
         // Fire and forget: never awaited by the capture path.
@@ -493,7 +518,7 @@
           probabilities,
           threshold: threshold(),
           model: MODEL_NAME,
-        });
+        }, blob);
       },
       // Clearing the log starts a new scan session, so rows from separate
       // rolls of cloth don't share an id.
@@ -510,6 +535,7 @@
 
     thumbCtx.drawImage(feed, src.sx, src.sy, src.sw, src.sh, 0, 0, 256, 256);
     const thumb = thumbCanvas.toDataURL("image/jpeg", 0.72);
+    const blobPromise = new Promise((resolve) => thumbCanvas.toBlob(resolve, "image/jpeg", 0.85));
     freeze.src = thumb;
     freeze.hidden = false;
     setTimeout(() => { if (live) freeze.hidden = true; }, 260);
@@ -523,7 +549,7 @@
         render(out.probs);
         paintTiles(out.tiles);
         $("spec-latency").textContent = out.ms.toFixed(0) + " ms";
-        addShot(thumb, out.probs);
+        addShot(thumb, out.probs, blobPromise);
       }
     } catch (err) {
       showNote("Capture failed: " + err.message, true);
@@ -533,7 +559,7 @@
     }
   }
 
-  function addShot(thumb, probs) {
+  function addShot(thumb, probs, blobPromise) {
     const defectProb = 1 - probs[CLEAN];
     const isDefect = defectProb >= threshold();
     const shown = isDefect ? CLASSES[worstDefect(probs)] : CLASSES[CLEAN];
@@ -542,7 +568,11 @@
 
     const shot = { at: at.toISOString(), label: shown.label, name: shown.name, conf, probs, defect: isDefect };
     shots.unshift(shot);
-    cloud.log(shot);
+    if (blobPromise && blobPromise.then) {
+      blobPromise.then((b) => cloud.log(shot, b));
+    } else {
+      cloud.log(shot);
+    }
 
     const li = document.createElement("li");
     li.className = "shot";

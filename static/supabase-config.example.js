@@ -1,4 +1,4 @@
-/* Supabase connection for the capture log.
+/* Supabase connection for the capture log and dataset collection.
    Copy this file to supabase-config.js (same folder) and fill in both values from
    Supabase > Project Settings > API. supabase-config.js is gitignored.
 
@@ -11,4 +11,5 @@ window.FABRIC_SUPABASE = {
   url: "",      // e.g. https://abcdefghijklmnop.supabase.co
   anonKey: "",  // the anon / publishable key
   table: "captures",
+  bucket: "fabric-captures",
 };
