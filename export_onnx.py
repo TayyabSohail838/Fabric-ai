@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from app import CLASS_NAMES, BaselineCNN, MEAN, STD
+from app import CLASS_NAMES, MEAN, STD, build_model
 
 ROOT = Path(__file__).resolve().parent
 WEIGHTS = ROOT / "fabric_model.pt"
@@ -26,7 +26,7 @@ def main() -> None:
     if not WEIGHTS.exists():
         sys.exit(f"Weights not found: {WEIGHTS}")
 
-    model = BaselineCNN(num_classes=len(CLASS_NAMES))
+    model = build_model(len(CLASS_NAMES))
     model.load_state_dict(torch.load(WEIGHTS, map_location="cpu"))
     model.eval()
 

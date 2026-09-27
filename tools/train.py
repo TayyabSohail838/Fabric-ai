@@ -76,6 +76,8 @@ def main() -> None:
     # Written next to the data first; copy over ROOT/fabric_model.pt once it checks out.
     ap.add_argument("--out", type=Path, default=ROOT / "data" / "fabric_model.pt")
     ap.add_argument("--workers", type=int, default=0)
+    ap.add_argument("--arch", choices=["baseline", "mobilenet_v3_small"], default="baseline",
+                    help="mobilenet_v3_small fine-tunes an ImageNet-pretrained backbone")
     args = ap.parse_args()
     torch.manual_seed(0)
     n = len(args.classes)
@@ -104,8 +106,13 @@ def main() -> None:
 
     tl = DataLoader(train, args.batch, sampler=sampler, num_workers=args.workers, persistent_workers=args.workers > 0)
     vl = DataLoader(val, 64, num_workers=args.workers)
-    model = BaselineCNN(num_classes=n)
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    if args.arch == "baseline":
+        model = BaselineCNN(num_classes=n)
+    else:
+        from torchvision.models import MobileNet_V3_Small_Weights, mobilenet_v3_small
+        model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features, n)
+    opt =torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
     loss_fn = nn.CrossEntropyLoss(weight=class_w)
 

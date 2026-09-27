@@ -70,10 +70,22 @@ class BaselineCNN(nn.Module):
         return x
 
 
+def build_model(num_classes: int) -> nn.Module:
+    """The architecture fabric_model.pt holds: MobileNetV3-small with a
+    num_classes head, fine-tuned from ImageNet weights by
+    `tools/train.py --arch mobilenet_v3_small`. BaselineCNN above is kept for
+    `--arch baseline` runs, but its checkpoints won't load here."""
+    from torchvision.models import mobilenet_v3_small
+
+    model = mobilenet_v3_small(weights=None)
+    model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
+    return model
+
+
 def load_model() -> nn.Module:
     if not WEIGHTS.exists():
         sys.exit(f"Weights not found: {WEIGHTS}\nPut fabric_model.pt next to app.py.")
-    model = BaselineCNN(num_classes=len(CLASSES))
+    model = build_model(len(CLASSES))
     model.load_state_dict(torch.load(WEIGHTS, map_location="cpu"))
     model.eval()
     return model

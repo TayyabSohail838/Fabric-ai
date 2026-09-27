@@ -77,31 +77,28 @@ The masthead shows `CPU` or `GPU` depending on whether WebGPU was available.
 
 Captures export to CSV with the full probability vector per row, for auditing.
 
-## Heads-up: the shipped model is untrained
+## The model
 
-`fabric_model.pt` contains a network that was saved **before it was trained**:
+`fabric_model.pt` is a MobileNetV3-small, fine-tuned from ImageNet weights on six classes,
+`['defect_free', 'hole', 'horizontal', 'lines', 'stain', 'verticle']` (order is fixed).
+On held-out source photos it scores val macro-F1 0.76 (accuracy 0.84) and test macro-F1 0.76
+(accuracy 0.91). `verticle` is the weakest class, and `horizontal` and `lines` are next;
+more photos of line-type defects from the real camera would help most.
 
-- Every weight tensor matches PyTorch's default `kaiming_uniform_` initialisation bounds
-  exactly, and the `fc1` weight histogram is perfectly flat across that range. Training
-  deforms that distribution; nothing here is deformed.
-- Feeding it black, white, grey, vertical stripes and horizontal stripes moves the logits by
-  a standard deviation of ~0.015. A trained network moves by whole units.
-- The output is therefore just `softmax(fc2.bias)` — a fixed ~19% on `lines` for every
-  image, no matter what the camera sees.
+`app.py` and the browser both run an untrained-weights check at startup (logit spread across
+flat and striped test plates must exceed 0.15) and show a banner if it fails.
 
-Both `app.py` and the browser run that same check at startup — and independently measure the
-same 0.0151 — so the interface shows a banner instead of presenting meaningless numbers as
-real. `webcam_demo.py` has the same problem silently.
+### Retraining
 
-Everything else — camera, preprocessing, batching, tiling — is correct and will produce real
-results the moment trained weights are dropped in. To fix it:
+The dataset archives go in the repo root; the generated crops go in `data/` (gitignored).
 
-1. Train `BaselineCNN` on your six-class dataset and overwrite `fabric_model.pt` with
-   `torch.save(model.state_dict(), "fabric_model.pt")`. Keep the class order:
-   `['defect_free', 'hole', 'horizontal', 'lines', 'stain', 'verticle']`
-2. Run `python export_onnx.py` to regenerate `static/fabric_model.onnx`. It verifies the
-   exported graph matches PyTorch to 1e-7 and refuses to write a model that doesn't.
-3. Commit and push. The banner disappears on its own once the logit spread clears 0.15.
+1. `python tools/build_dataset.py --out data/_all` crops every mapped box or polygon.
+2. `python tools/split_dataset.py --src data/_all --out data` splits 80/15/5 by source photo.
+3. `python tools/train.py --arch mobilenet_v3_small --classes defect_free hole horizontal lines stain verticle --epochs 15 --lr 5e-4`
+   keeps the epoch with the best val macro-F1 in `data/fabric_model.pt`. Copy it over
+   `fabric_model.pt`.
+4. `python export_onnx.py` regenerates `static/fabric_model.onnx` and refuses to write a
+   graph that drifts from PyTorch by more than 1e-5.
 
 ## Optional: the Python API
 

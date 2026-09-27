@@ -1,38 +1,19 @@
 import cv2
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torchvision import transforms
+from torchvision.models import mobilenet_v3_small
 from PIL import Image
 
-class BaselineCNN(nn.Module):
-    def __init__(self, num_classes=6):
-        super(BaselineCNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, 3, padding=1)
-        self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
-        self.conv3 = nn.Conv2d(32, 64, 3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 28 * 28, 128)
-        self.fc2 = nn.Linear(128, num_classes)
-        self.dropout = nn.Dropout(0.3)
+class_names = ['defect_free', 'hole', 'horizontal', 'lines', 'stain', 'verticle']
 
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        return x
-
+# Same architecture as build_model() in app.py: MobileNetV3-small with a new head.
 print("Loading model...")
-model = BaselineCNN(num_classes=6)
+model = mobilenet_v3_small(weights=None)
+model.classifier[3] = nn.Linear(model.classifier[3].in_features, len(class_names))
 model.load_state_dict(torch.load("fabric_model.pt", map_location="cpu"))
 model.eval()
 print("Model loaded.")
-
-class_names = ['defect_free', 'hole', 'horizontal', 'lines', 'stain', 'verticle']
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
