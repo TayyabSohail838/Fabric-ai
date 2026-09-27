@@ -45,6 +45,7 @@
     { name: "verticle", label: "Warp line", hint: "A line running along the warp." },
   ];
   const CLEAN = 0;
+  const MODEL_NAME = "mobilenet-v3"; // stamped on cloud rows; keep in step with the masthead
   const SIDE = 224;
   const PIXELS = SIDE * SIDE;
   const MEAN = [0.485, 0.456, 0.406];
@@ -415,6 +416,91 @@
     $("tally-fps").textContent = "—";
   }
 
+  /* ── Cloud log (Supabase) ───────────────────────────────────── */
+
+  // Optional. Each capture is also inserted into Supabase when
+  // supabase-config.js is present. Every failure path ends in a console
+  // message - the camera, inference and local log never wait on the network.
+  const INSERT_TIMEOUT_MS = 8000;
+
+  const newId = () =>
+    self.crypto && crypto.randomUUID
+      ? crypto.randomUUID()
+      : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+          (c ^ (Math.random() * 16) >> (c / 4)).toString(16));
+
+  // Same browser = same device across reloads. Storage can be blocked
+  // (private mode, cleared site data), so fall back to one per page load.
+  function deviceId() {
+    try {
+      let id = localStorage.getItem("fabric.deviceId");
+      if (!id) { id = newId(); localStorage.setItem("fabric.deviceId", id); }
+      return id;
+    } catch {
+      return newId();
+    }
+  }
+
+  const cloud = (() => {
+    const cfg = window.FABRIC_SUPABASE || {};
+    if (!cfg.url || !cfg.anonKey) {
+      console.info("[cloud] No supabase-config.js - captures stay local only.");
+      return { log() {}, newSession() {} };
+    }
+    if (!window.supabase || !window.supabase.createClient) {
+      console.warn("[cloud] Supabase client did not load (offline or CDN blocked) - captures stay local only.");
+      return { log() {}, newSession() {} };
+    }
+
+    let client;
+    try {
+      client = window.supabase.createClient(cfg.url, cfg.anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+    } catch (err) {
+      console.warn("[cloud] Bad Supabase config - captures stay local only.", err);
+      return { log() {}, newSession() {} };
+    }
+
+    const table = cfg.table || "captures";
+    const device = deviceId();
+    let sessionId = newId();
+
+    async function insert(row) {
+      try {
+        // No .select() afterwards: the anon role may insert but not read back.
+        let query = client.from(table).insert(row);
+        if (AbortSignal.timeout) query = query.abortSignal(AbortSignal.timeout(INSERT_TIMEOUT_MS));
+        const { error } = await query;
+        if (error) console.warn("[cloud] Insert rejected:", error.message || error, row);
+      } catch (err) {
+        console.warn("[cloud] Insert failed (offline?):", err.message || err, row);
+      }
+    }
+
+    return {
+      log(shot) {
+        const probabilities = {};
+        CLASSES.forEach((c, i) => { probabilities[c.name] = Number(shot.probs[i].toFixed(6)); });
+        // Fire and forget: never awaited by the capture path.
+        insert({
+          captured_at: shot.at,
+          session_id: sessionId,
+          device_id: device,
+          verdict: shot.defect ? "defect" : "pass",
+          class_name: shot.name,
+          confidence: Number(shot.conf.toFixed(6)),
+          probabilities,
+          threshold: threshold(),
+          model: MODEL_NAME,
+        });
+      },
+      // Clearing the log starts a new scan session, so rows from separate
+      // rolls of cloth don't share an id.
+      newSession() { sessionId = newId(); },
+    };
+  })();
+
   /* ── Capture ────────────────────────────────────────────────── */
 
   async function capture() {
@@ -454,7 +540,9 @@
     const conf = isDefect ? defectProb : probs[CLEAN];
     const at = new Date();
 
-    shots.unshift({ at: at.toISOString(), label: shown.label, name: shown.name, conf, probs, defect: isDefect });
+    const shot = { at: at.toISOString(), label: shown.label, name: shown.name, conf, probs, defect: isDefect };
+    shots.unshift(shot);
+    cloud.log(shot);
 
     const li = document.createElement("li");
     li.className = "shot";
@@ -506,6 +594,7 @@
     btnExport.disabled = true;
     btnClear.disabled = true;
     updateTally();
+    cloud.newSession();
   }
 
   /* ── Camera ─────────────────────────────────────────────────── */

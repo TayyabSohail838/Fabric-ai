@@ -8,6 +8,10 @@ venv/
 # (.certs/dev.key is a private key - never commit it)
 .certs/
 
+# Supabase project URL and anon key. The committed template is
+# static/supabase-config.example.js.
+static/supabase-config.js
+
 # Tooling scratch
 .playwright-mcp/
 *.log
